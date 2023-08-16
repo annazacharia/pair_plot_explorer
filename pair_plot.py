@@ -13,15 +13,22 @@ def load_dataset(dataset_path):
 
 def generate_pair_plot(df, color_by=None):
     sns.set(style="ticks")
+    numerical_columns = df.select_dtypes(include=["number"]).columns.tolist()
     if color_by:
-        plot_data = sns.pairplot(df, hue=color_by)
+        plot_data = sns.pairplot(df, vars=numerical_columns, hue=color_by)
+        plot_data._legend.remove() 
     else:
-        plot_data = sns.pairplot(df)
+        plot_data = sns.pairplot(df, vars=numerical_columns)
     return plot_data
+
 
 def get_available_datasets():
     dataset_files = root.glob("*.csv")
     return [dataset.stem for dataset in dataset_files]
+
+def get_categorical_columns(df):
+    categorical_columns = df.select_dtypes(include=["category", "object"]).columns.tolist()
+    return categorical_columns
 
 st.title("Pair Plot Explorer")
 
@@ -36,13 +43,18 @@ if not available_datasets:
         with open(root / uploaded_file.name, "wb") as f:
             f.write(uploaded_file.read())
         st.success(f"Uploaded and added dataset: {uploaded_file.name}")
+        st.experimental_rerun()  # Restart the app to refresh the sidebar
 else:
     selected_dataset = st.sidebar.selectbox("Select a dataset", available_datasets)
     df = load_dataset(root / (selected_dataset + ".csv"))
+    df.columns = df.columns.str.lower()
 
+    categorical_columns = get_categorical_columns(df)
+    
     show_color_by_option = st.sidebar.checkbox("Color by a categorical column")
     if show_color_by_option:
-        color_by = st.sidebar.selectbox("Select a categorical column to use as color by", df.columns)
+        color_by_option = st.sidebar.selectbox("Select a categorical column to use as color by", ["None"] + categorical_columns)
+        color_by = color_by_option.lower() if color_by_option != "None" else None
     else:
         color_by = None
 
@@ -52,11 +64,12 @@ else:
         with open(root / uploaded_file.name, "wb") as f:
             f.write(uploaded_file.read())
         st.success(f"Uploaded and added dataset: {uploaded_file.name}")
+        st.experimental_rerun()  
 
     st.write("Dataset Summary")
     st.write(df.head())
 
     st.title("Pair Plot")
-    pair_plot = generate_pair_plot(df.select_dtypes(include="number"), color_by)
+    pair_plot = generate_pair_plot(df, color_by)
     st.pyplot(pair_plot)
 
